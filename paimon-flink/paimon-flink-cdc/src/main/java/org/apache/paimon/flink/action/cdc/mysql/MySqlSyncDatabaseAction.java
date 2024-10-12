@@ -95,6 +95,7 @@ public class MySqlSyncDatabaseAction extends SyncDatabaseActionBase {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSyncDatabaseAction.class);
 
     private boolean ignoreIncompatible = false;
+    private int initBucketRowNum = -1;
 
     // for test purpose
     private final List<Identifier> monitoredTables = new ArrayList<>();
@@ -114,6 +115,11 @@ public class MySqlSyncDatabaseAction extends SyncDatabaseActionBase {
         return this;
     }
 
+    public MySqlSyncDatabaseAction withInitBucketRowNum(int parseInt) {
+        this.initBucketRowNum = parseInt;
+        return this;
+    }
+
     @Override
     protected void beforeBuildingSourceSink() throws Exception {
         Pattern includingPattern = Pattern.compile(includingTables);
@@ -125,7 +131,8 @@ public class MySqlSyncDatabaseAction extends SyncDatabaseActionBase {
                         tableName ->
                                 shouldMonitorTable(tableName, includingPattern, excludingPattern),
                         excludedTables,
-                        typeMapping);
+                        typeMapping,
+                        initBucketRowNum);
 
         logNonPkTables(mySqlSchemasInfo.nonPkTables());
         List<JdbcTableInfo> jdbcTableInfos = mySqlSchemasInfo.toMySqlTableInfos(mergeShards);
