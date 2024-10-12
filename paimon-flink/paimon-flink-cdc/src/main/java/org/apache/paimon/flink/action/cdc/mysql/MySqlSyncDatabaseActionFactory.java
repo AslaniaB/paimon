@@ -24,6 +24,7 @@ import org.apache.paimon.flink.action.cdc.SyncDatabaseActionFactoryBase;
 
 import java.util.Arrays;
 
+import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.INIT_BUCKET_ROW_NUM;
 import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.METADATA_COLUMN;
 import static org.apache.paimon.flink.action.cdc.CdcActionCommonUtils.MYSQL_CONF;
 
@@ -62,6 +63,9 @@ public class MySqlSyncDatabaseActionFactory
         if (params.has(METADATA_COLUMN)) {
             action.withMetadataColumns(Arrays.asList(params.get(METADATA_COLUMN).split(",")));
         }
+        if (params.has(INIT_BUCKET_ROW_NUM)) {
+            action.withInitBucketRowNum(Integer.parseInt(params.get(INIT_BUCKET_ROW_NUM)));
+        }
     }
 
     @Override
@@ -86,6 +90,7 @@ public class MySqlSyncDatabaseActionFactory
                         + "[--mode <sync_mode>] "
                         + "[--metadata_column <metadata_column>] "
                         + "[--type_mapping <option1,option2...>] "
+                        + "[--init_bucket_row_num <row_number>] "
                         + "[--mysql_conf <mysql_cdc_source_conf> [--mysql_conf <mysql_cdc_source_conf> ...]] "
                         + "[--catalog_conf <paimon_catalog_conf> [--catalog_conf <paimon_catalog_conf> ...]] "
                         + "[--table_conf <paimon_table_sink_conf> [--table_conf <paimon_table_sink_conf> ...]]");
@@ -135,6 +140,12 @@ public class MySqlSyncDatabaseActionFactory
 
         System.out.println(
                 "--type_mapping is used to specify how to map MySQL type to Paimon type. Please see the doc for usage.");
+        System.out.println();
+
+        System.out.println(
+                "--init_bucket_row_num is used to calculate the bucket for each paimon table to be created. "
+                        + "If set, a new value (bucket = <table_row_counts> / init_bucket_row_num + 1) will be "
+                        + "auto calculated to overwrite the value of table_conf 'bucket'");
         System.out.println();
 
         System.out.println("MySQL CDC source conf syntax:");
