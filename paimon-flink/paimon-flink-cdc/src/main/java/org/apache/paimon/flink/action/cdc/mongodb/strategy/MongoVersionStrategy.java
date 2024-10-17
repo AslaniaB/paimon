@@ -30,6 +30,7 @@ import org.apache.paimon.shade.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.paimon.shade.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
 import org.apache.flink.configuration.Configuration;
 
 import java.util.Collections;
@@ -41,6 +42,7 @@ import java.util.Optional;
 import static org.apache.paimon.flink.action.cdc.mongodb.MongoDBActionUtils.DEFAULT_ID_GENERATION;
 import static org.apache.paimon.flink.action.cdc.mongodb.MongoDBActionUtils.FIELD_NAME;
 import static org.apache.paimon.flink.action.cdc.mongodb.MongoDBActionUtils.PARSER_PATH;
+import static org.apache.paimon.flink.action.cdc.mongodb.MongoDBActionUtils.PATH_EXISTS_CHECK;
 import static org.apache.paimon.flink.action.cdc.mongodb.MongoDBActionUtils.START_MODE;
 
 /** Interface for processing strategies tailored for different MongoDB versions. */
@@ -104,7 +106,8 @@ public interface MongoVersionStrategy {
                         mongodbConfig.getString(PARSER_PATH),
                         mongodbConfig.getString(FIELD_NAME),
                         computedColumns,
-                        rowTypeBuilder);
+                        rowTypeBuilder,
+                        mongodbConfig.getBoolean(PATH_EXISTS_CHECK));
             case DYNAMIC:
                 return parseAndTypeJsonRow(document.toString(), rowTypeBuilder, computedColumns);
             default:
@@ -125,16 +128,22 @@ public interface MongoVersionStrategy {
             String fieldPaths,
             String fieldNames,
             List<ComputedColumn> computedColumns,
-            RowType.Builder rowTypeBuilder) {
+            RowType.Builder rowTypeBuilder,
+            boolean pathExistsCheck) {
         String[] columnNames = fieldNames.split(",");
         String[] parseNames = fieldPaths.split(",");
         Map<String, String> parsedRow = new HashMap<>();
-
+        com.jayway.jsonpath.Configuration jsonpathConf =
+                com.jayway.jsonpath.Configuration.builder()
+                        .options(Option.SUPPRESS_EXCEPTIONS)
+                        .build();
         for (int i = 0; i < parseNames.length; i++) {
-            String evaluate = JsonPath.read(record, parseNames[i]);
+            String evaluate =
+                    pathExistsCheck
+                            ? JsonPath.read(record, parseNames[i])
+                            : JsonPath.parse(record, jsonpathConf).read(parseNames[i]);
             parsedRow.put(columnNames[i], Optional.ofNullable(evaluate).orElse("{}"));
         }
-
         return processParsedData(parsedRow, rowTypeBuilder, computedColumns);
     }
 
