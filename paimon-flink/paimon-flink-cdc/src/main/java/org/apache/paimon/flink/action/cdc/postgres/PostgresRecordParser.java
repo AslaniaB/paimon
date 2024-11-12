@@ -89,6 +89,11 @@ public class PostgresRecordParser
 
     private static final Logger LOG = LoggerFactory.getLogger(PostgresRecordParser.class);
 
+    private static final String PAYLOAD_OP_INSERT = "c";
+    private static final String PAYLOAD_OP_UPDATE = "u";
+    private static final String PAYLOAD_OP_DELETE = "d";
+    private static final String PAYLOAD_OP_READ = "r";
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ZoneId serverTimeZone;
     private final boolean caseSensitive;
@@ -239,23 +244,44 @@ public class PostgresRecordParser
     private List<RichCdcMultiplexRecord> extractRecords() {
         List<RichCdcMultiplexRecord> records = new ArrayList<>();
 
+        String op = root.payload().op();
         Map<String, String> before = extractRow(root.payload().before());
         if (!before.isEmpty()) {
             before = mapKeyCaseConvert(before, caseSensitive, recordKeyDuplicateErrMsg(before));
-            records.add(createRecord(RowKind.DELETE, before));
+            RowKind rowKind;
+            if (op.equalsIgnoreCase(PAYLOAD_OP_DELETE)) {
+                rowKind = RowKind.DELETE;
+            } else if (op.equalsIgnoreCase(PAYLOAD_OP_UPDATE)) {
+                rowKind = RowKind.UPDATE_BEFORE;
+            } else {
+                throw new IllegalStateException(
+                        String.format(
+                                "Debezium event state (op=%s, before=%s) is illegal.", op, before));
+            }
+            records.add(createRecord(rowKind, before));
         }
 
         Map<String, String> after = extractRow(root.payload().after());
         if (!after.isEmpty()) {
             after = mapKeyCaseConvert(after, caseSensitive, recordKeyDuplicateErrMsg(after));
             List<DataField> fields = extractFields(root.schema());
+            RowKind rowKind;
+            if (op.equalsIgnoreCase(PAYLOAD_OP_INSERT) || op.equalsIgnoreCase(PAYLOAD_OP_READ)) {
+                rowKind = RowKind.INSERT;
+            } else if (op.equalsIgnoreCase(PAYLOAD_OP_UPDATE)) {
+                rowKind = RowKind.UPDATE_AFTER;
+            } else {
+                throw new IllegalStateException(
+                        String.format(
+                                "Debezium event state (op=%s, after=%s) is illegal.", op, after));
+            }
             records.add(
                     new RichCdcMultiplexRecord(
                             databaseName,
                             currentTable,
                             fields,
                             Collections.emptyList(),
-                            new CdcRecord(RowKind.INSERT, after)));
+                            new CdcRecord(rowKind, after)));
         }
 
         return records;

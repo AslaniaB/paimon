@@ -107,8 +107,8 @@ public class Mongo4VersionStrategy implements MongoVersionStrategy {
                 // Before version 6.0 of MongoDB, it was not possible to obtain 'Update Before'
                 // information. Therefore, data is first deleted using the primary key '_id', and
                 // then inserted.
-                records.add(processRecord(documentKey, RowKind.DELETE));
-                records.add(processRecord(fullDocument, RowKind.INSERT));
+                records.add(processRecord(documentKey, RowKind.UPDATE_BEFORE));
+                records.add(processRecord(fullDocument, RowKind.UPDATE_AFTER));
                 break;
             case OP_DELETE:
                 records.add(processRecord(documentKey, RowKind.DELETE));
