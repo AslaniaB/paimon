@@ -109,8 +109,8 @@ public class CanalRecordParser extends RecordParser {
                     Map<JsonNode, JsonNode> matchedOldRecords =
                             matchOldRecords(arrayData, oldArrayData);
                     JsonNode old = matchedOldRecords.get(data);
-                    processRecord(mergeOldRecord(data, old), RowKind.DELETE, records);
-                    processRecord(data, RowKind.INSERT, records);
+                    processRecord(mergeOldRecord(data, old), RowKind.UPDATE_BEFORE, records);
+                    processRecord(data, RowKind.UPDATE_AFTER, records);
                     break;
                 case OP_INSERT:
                 case OP_ROW:

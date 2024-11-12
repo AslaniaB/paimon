@@ -99,8 +99,10 @@ public class DebeziumRecordParser extends RecordParser {
                 break;
             case OP_UPDATE:
                 processRecord(
-                        mergeOldRecord(getData(), getBefore(operation)), RowKind.DELETE, records);
-                processRecord(getData(), RowKind.INSERT, records);
+                        mergeOldRecord(getData(), getBefore(operation)),
+                        RowKind.UPDATE_BEFORE,
+                        records);
+                processRecord(getData(), RowKind.UPDATE_AFTER, records);
                 break;
             case OP_DELETE:
                 processRecord(getBefore(operation), RowKind.DELETE, records);
