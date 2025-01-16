@@ -87,6 +87,15 @@ public class MongoDBActionUtils {
                     .withDescription(
                             "Determines whether to use the default MongoDB _id generation strategy. If set to true, the default _id generation will remove the outer $oid nesting. If set to false, no additional processing will be done on the _id field.");
 
+    public static final ConfigOption<Boolean> PATH_EXISTS_CHECK =
+            ConfigOptions.key("path.exists.check")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Determines whether to throw exception while JSON parsing path for field doesn't exists. "
+                                    + "If set to true, it will throw exception to failed the task."
+                                    + "If set to false, it will set null for the value of parsing path.");
+
     public static MongoDBSource<CdcSourceRecord> buildMongodbSource(
             Configuration mongodbConfig, String tableList) {
         MongoDBSourceBuilder<CdcSourceRecord> sourceBuilder = MongoDBSource.builder();
