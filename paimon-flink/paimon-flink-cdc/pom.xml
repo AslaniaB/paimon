@@ -322,6 +322,10 @@ under the License.
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>org.apache.flink.kafka.shaded.org.apache.kafka</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>com.jayway.jsonpath</pattern>
+                                    <shadedPattern>org.apache.flink.table.shaded.com.jayway.jsonpath</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
