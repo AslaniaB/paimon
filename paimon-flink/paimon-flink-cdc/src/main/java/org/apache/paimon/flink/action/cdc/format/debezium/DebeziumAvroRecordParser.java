@@ -94,8 +94,10 @@ public class DebeziumAvroRecordParser extends AbstractRecordParser {
                 processRecord((GenericRecord) getAndCheck(FIELD_AFTER), RowKind.INSERT, records);
                 break;
             case OP_UPDATE:
-                processRecord((GenericRecord) getAndCheck(FIELD_BEFORE), RowKind.DELETE, records);
-                processRecord((GenericRecord) getAndCheck(FIELD_AFTER), RowKind.INSERT, records);
+                processRecord(
+                        (GenericRecord) getAndCheck(FIELD_BEFORE), RowKind.UPDATE_BEFORE, records);
+                processRecord(
+                        (GenericRecord) getAndCheck(FIELD_AFTER), RowKind.UPDATE_AFTER, records);
                 break;
             case OP_DELETE:
                 processRecord((GenericRecord) getAndCheck(FIELD_BEFORE), RowKind.DELETE, records);

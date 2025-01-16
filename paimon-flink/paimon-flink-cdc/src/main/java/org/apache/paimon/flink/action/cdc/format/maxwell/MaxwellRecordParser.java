@@ -65,8 +65,8 @@ public class MaxwellRecordParser extends AbstractJsonRecordParser {
                 break;
             case OP_UPDATE:
                 JsonNode old = getAndCheck(FIELD_OLD, FIELD_TYPE, operation);
-                processRecord(mergeOldRecord(data, old), RowKind.DELETE, records);
-                processRecord(data, RowKind.INSERT, records);
+                processRecord(mergeOldRecord(data, old), RowKind.UPDATE_BEFORE, records);
+                processRecord(data, RowKind.UPDATE_AFTER, records);
                 break;
             case OP_DELETE:
                 processRecord(data, RowKind.DELETE, records);
