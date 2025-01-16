@@ -92,8 +92,8 @@ public class DMSRecordParser extends AbstractJsonRecordParser {
                 break;
             case OP_UPDATE:
                 Pair<JsonNode, JsonNode> dataAndBeforeNodes = splitBeforeAndData(dataNode);
-                processRecord(dataAndBeforeNodes.getRight(), RowKind.DELETE, records);
-                processRecord(dataAndBeforeNodes.getLeft(), RowKind.INSERT, records);
+                processRecord(dataAndBeforeNodes.getRight(), RowKind.UPDATE_BEFORE, records);
+                processRecord(dataAndBeforeNodes.getLeft(), RowKind.UPDATE_AFTER, records);
                 break;
             case OP_DELETE:
                 processRecord(dataNode, RowKind.DELETE, records);
