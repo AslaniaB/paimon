@@ -68,8 +68,8 @@ public class OggRecordParser extends AbstractJsonRecordParser {
         String operation = getAndCheck(FIELD_TYPE).asText();
         switch (operation) {
             case OP_UPDATE:
-                processRecord(getBefore(operation), RowKind.DELETE, records);
-                processRecord(getData(), RowKind.INSERT, records);
+                processRecord(getBefore(operation), RowKind.UPDATE_BEFORE, records);
+                processRecord(getData(), RowKind.UPDATE_AFTER, records);
                 break;
             case OP_INSERT:
                 processRecord(getData(), RowKind.INSERT, records);

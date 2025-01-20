@@ -18,6 +18,7 @@
 
 package org.apache.paimon.flink.action.cdc.mysql;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.action.cdc.CdcSourceRecord;
 import org.apache.paimon.flink.action.cdc.TypeMapping;
@@ -26,6 +27,8 @@ import org.apache.paimon.flink.action.cdc.schema.JdbcSchemasInfo;
 import org.apache.paimon.flink.action.cdc.serialization.CdcDebeziumDeserializationSchema;
 import org.apache.paimon.flink.action.cdc.watermark.CdcTimestampExtractor;
 import org.apache.paimon.schema.Schema;
+
+import org.apache.paimon.shade.guava30.com.google.common.collect.Maps;
 
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceBuilder;
@@ -46,6 +49,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,13 +105,14 @@ public class MySqlActionUtils {
             Configuration mySqlConfig,
             Predicate<String> monitorTablePredication,
             List<Identifier> excludedTables,
-            TypeMapping typeMapping)
+            TypeMapping typeMapping,
+            int bucketRowNum)
             throws Exception {
         Pattern databasePattern =
                 Pattern.compile(mySqlConfig.get(MySqlSourceOptions.DATABASE_NAME));
         JdbcSchemasInfo mySqlSchemasInfo = new JdbcSchemasInfo();
         Map<String, String> jdbcProperties = getJdbcProperties(typeMapping, mySqlConfig);
-
+        HashMap<Identifier, Schema> schamaMap = Maps.newHashMap();
         try (Connection conn = MySqlActionUtils.getConnection(mySqlConfig, jdbcProperties)) {
             DatabaseMetaData metaData = conn.getMetaData();
             try (ResultSet schemas = metaData.getCatalogs()) {
@@ -132,12 +137,36 @@ public class MySqlActionUtils {
                                                 tableComment,
                                                 typeMapping,
                                                 toPaimonTypeVisitor());
-                                mySqlSchemasInfo.addSchema(identifier, schema);
+                                schamaMap.put(identifier, schema);
                             } else {
                                 excludedTables.add(identifier);
                             }
                         }
                     }
+                }
+            }
+
+            if (bucketRowNum > 0) {
+                Statement statement = conn.createStatement();
+                for (Map.Entry<Identifier, Schema> entry : schamaMap.entrySet()) {
+                    Identifier identifier = entry.getKey();
+                    Schema schema = entry.getValue();
+                    LOG.info("Try to get the row count for the table {}", identifier.getFullName());
+                    try (ResultSet rs =
+                            statement.executeQuery(
+                                    "select count(1) from " + identifier.getFullName())) {
+                        if (rs.next()) {
+                            int rowCount = rs.getInt(1);
+                            int bucket = rowCount / bucketRowNum + 1;
+                            LOG.info(
+                                    "Row count of table {} is {}, setup the bucket={}",
+                                    identifier.getObjectName(),
+                                    rowCount,
+                                    bucket);
+                            schema.options().put(CoreOptions.BUCKET.key(), String.valueOf(bucket));
+                        }
+                    }
+                    mySqlSchemasInfo.addSchema(identifier, schema);
                 }
             }
         }
