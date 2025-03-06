@@ -29,6 +29,7 @@ org.apache.paimon.flink.action.cdc.postgres.PostgresSyncTableActionFactory
 ### message queue data format factories
 org.apache.paimon.flink.action.cdc.format.aliyun.AliyunDataFormatFactory
 org.apache.paimon.flink.action.cdc.format.canal.CanalDataFormatFactory
+org.apache.paimon.flink.action.cdc.format.canal.extend.TimeStampCanalDataFormatFactory
 org.apache.paimon.flink.action.cdc.format.debezium.DebeziumAvroDataFormatFactory
 org.apache.paimon.flink.action.cdc.format.debezium.DebeziumJsonDataFormatFactory
 org.apache.paimon.flink.action.cdc.format.json.JsonDataFormatFactory
