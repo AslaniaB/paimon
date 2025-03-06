@@ -25,8 +25,11 @@ import org.apache.paimon.flink.sink.cdc.CdcRecord;
 import org.apache.paimon.flink.sink.cdc.RichCdcMultiplexRecord;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.types.DataField;
+import org.apache.paimon.types.DataTypeFamily;
 import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
+import org.apache.paimon.types.TimestampType;
+import org.apache.paimon.utils.DateTimeUtils;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.util.Collector;
@@ -127,12 +130,38 @@ public abstract class AbstractRecordParser
     /** Handle case sensitivity here. */
     protected RichCdcMultiplexRecord createRecord(
             RowKind rowKind, Map<String, String> data, List<DataField> paimonFields) {
+        correctTimestampValue(data, paimonFields);
         return new RichCdcMultiplexRecord(
                 getDatabaseName(),
                 getTableName(),
                 paimonFields,
                 extractPrimaryKeys(),
                 new CdcRecord(rowKind, data));
+    }
+
+    private void correctTimestampValue(Map<String, String> data, List<DataField> paimonFields) {
+        paimonFields.stream()
+                .filter(dataField -> dataField.type().is(DataTypeFamily.TIMESTAMP))
+                .forEach(
+                        dataField -> {
+                            String value = data.get(dataField.name());
+                            if (value != null) {
+                                try {
+                                    DateTimeUtils.parseTimestampData(
+                                            value,
+                                            ((TimestampType) dataField.type()).getPrecision());
+                                } catch (Exception e) {
+                                    LOG.warn(
+                                            "Catched invalid timestamp value for table {}.{}(column:{}), "
+                                                    + "auto convert to null. Invalid value is {}",
+                                            getDatabaseName(),
+                                            getTableName(),
+                                            dataField.name(),
+                                            value);
+                                    data.put(dataField.name(), null);
+                                }
+                            }
+                        });
     }
 
     @Nullable
