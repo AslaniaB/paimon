@@ -36,6 +36,12 @@ under the License.
     <dependencies>
         <dependency>
             <groupId>org.apache.paimon</groupId>
+            <artifactId>paimon-hive-catalog</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.paimon</groupId>
             <artifactId>paimon-hive-common</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -99,13 +105,6 @@ under the License.
             <artifactId>paimon-hive-common</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.paimon</groupId>
-            <artifactId>paimon-hive-catalog</artifactId>
-            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
 
