@@ -904,6 +904,47 @@ public class PartialUpdateMergeFunctionTest {
                 .hasMessageContaining("Must use sequence group for aggregation functions");
     }
 
+    @Test
+    public void testRegexSequenceGroup() {
+        Options options = new Options();
+        options.set("fields.f3.sequence-group", "f1,f2");
+        options.set("fields.f6.sequence-group", "f4*,f5");
+        RowType rowType =
+                RowType.of(
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT());
+        MergeFunction<KeyValue> func =
+                PartialUpdateMergeFunction.factory(options, rowType, ImmutableList.of("f0"))
+                        .create();
+        func.reset();
+        add(func, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+        add(func, 1, 2, 2, 2, 2, 2, null, 2, 2);
+        validate(func, 1, 2, 2, 2, 1, 1, 1, 1, 1);
+        add(func, 1, 3, 3, 1, 3, 3, 3, 3, 3);
+        validate(func, 1, 2, 2, 2, 3, 3, 3, 3, 3);
+
+        // Test with more fields matching the regex pattern
+        options = new Options();
+        options.set("fields.f3.sequence-group", "f1,f2");
+        options.set("fields.f6.sequence-group", "f4*,f5*");
+        func =
+                PartialUpdateMergeFunction.factory(options, rowType, ImmutableList.of("f0"))
+                        .create();
+        func.reset();
+        add(func, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+        add(func, 1, 2, 2, 2, 2, 2, null, 2, 2);
+        validate(func, 1, 2, 2, 2, 1, 1, 1, 1, 1);
+        add(func, 1, 3, 3, 1, 3, 3, 3, 3, 3);
+        validate(func, 1, 2, 2, 2, 3, 3, 3, 3, 3);
+    }
+
     private void add(MergeFunction<KeyValue> function, Integer... f) {
         add(function, RowKind.INSERT, f);
     }

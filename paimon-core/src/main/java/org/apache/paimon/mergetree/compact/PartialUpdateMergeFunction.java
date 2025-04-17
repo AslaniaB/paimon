@@ -34,6 +34,9 @@ import org.apache.paimon.utils.Preconditions;
 import org.apache.paimon.utils.Projection;
 import org.apache.paimon.utils.UserDefinedSeqComparator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
@@ -45,6 +48,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -60,6 +65,8 @@ import static org.apache.paimon.utils.InternalRowUtils.createFieldGetters;
  * non-null fields on merge.
  */
 public class PartialUpdateMergeFunction implements MergeFunction<KeyValue> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PartialUpdateMergeFunction.class);
 
     public static final String SEQUENCE_GROUP = "sequence-group";
 
@@ -321,21 +328,45 @@ public class PartialUpdateMergeFunction implements MergeFunction<KeyValue> {
 
                     Supplier<FieldsComparator> userDefinedSeqComparator =
                             () -> UserDefinedSeqComparator.create(rowType, sequenceFields, true);
-                    Arrays.stream(v.split(FIELDS_SEPARATOR))
-                            .map(
-                                    fieldName ->
-                                            fieldNames.indexOf(
-                                                    validateFieldName(fieldName, fieldNames)))
-                            .forEach(
-                                    field -> {
-                                        if (fieldSeqComparators.containsKey(field)) {
-                                            throw new IllegalArgumentException(
-                                                    String.format(
-                                                            "Field %s is defined repeatedly by multiple groups: %s",
-                                                            fieldNames.get(field), k));
-                                        }
-                                        fieldSeqComparators.put(field, userDefinedSeqComparator);
-                                    });
+
+                    // Handle regex patterns in sequence group fields
+                    String[] targetFieldPatterns = v.split(FIELDS_SEPARATOR);
+                    for (String fieldExp : targetFieldPatterns) {
+                        if (fieldExp.contains("*") || fieldExp.contains("?")) {
+                            // Convert wildcard pattern to regex pattern
+                            Pattern pattern = Pattern.compile(fieldExp);
+
+                            // Find all matching fields
+                            for (int i = 0; i < fieldNames.size(); i++) {
+                                String fieldName = fieldNames.get(i);
+                                Matcher matcher = pattern.matcher(fieldName);
+                                if (matcher.matches() && !sequenceFields.contains(fieldName)) {
+                                    if (fieldSeqComparators.containsKey(i)) {
+                                        throw new IllegalArgumentException(
+                                                String.format(
+                                                        "Field %s is defined repeatedly by multiple groups: %s",
+                                                        fieldName, k));
+                                    }
+                                    fieldSeqComparators.put(i, userDefinedSeqComparator);
+                                    LOG.info(
+                                            String.format(
+                                                    "qf-log: extract the field %s for sequence-group expression: %s",
+                                                    fieldName, fieldExp));
+                                }
+                            }
+                        } else {
+                            // Handle non-regex fields as before
+                            int fieldIndex =
+                                    fieldNames.indexOf(validateFieldName(fieldExp, fieldNames));
+                            if (fieldSeqComparators.containsKey(fieldIndex)) {
+                                throw new IllegalArgumentException(
+                                        String.format(
+                                                "Field %s is defined repeatedly by multiple groups: %s",
+                                                fieldNames.get(fieldIndex), k));
+                            }
+                            fieldSeqComparators.put(fieldIndex, userDefinedSeqComparator);
+                        }
+                    }
 
                     // add self
                     sequenceFields.forEach(

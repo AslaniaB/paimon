@@ -36,6 +36,9 @@ import org.apache.paimon.types.RowType;
 import org.apache.paimon.types.VarCharType;
 import org.apache.paimon.utils.StringUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -45,6 +48,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.paimon.CoreOptions.BUCKET_KEY;
@@ -79,6 +83,7 @@ import static org.apache.paimon.utils.Preconditions.checkState;
 
 /** Validation utils for {@link TableSchema}. */
 public class SchemaValidation {
+    private static final Logger LOG = LoggerFactory.getLogger(SchemaValidation.class);
 
     public static final List<Class<? extends DataType>> PRIMARY_KEY_UNSUPPORTED_LOGICAL_TYPES =
             Arrays.asList(MapType.class, ArrayType.class, RowType.class, MultisetType.class);
@@ -391,44 +396,58 @@ public class SchemaValidation {
         for (Map.Entry<String, String> entry : options.toMap().entrySet()) {
             String k = entry.getKey();
             String v = entry.getValue();
-            List<String> fieldNames = schema.fieldNames();
+            List<String> tbFieldNames = Collections.unmodifiableList(schema.fieldNames());
             if (k.startsWith(FIELDS_PREFIX) && k.endsWith(SEQUENCE_GROUP)) {
-                String[] sequenceFieldNames =
-                        k.substring(
-                                        FIELDS_PREFIX.length() + 1,
-                                        k.length() - SEQUENCE_GROUP.length() - 1)
-                                .split(FIELDS_SEPARATOR);
+                LOG.info(String.format("qf-log: key=%s, value=%s", k, v));
+                List<String> sequenceFieldNames =
+                        Collections.unmodifiableList(
+                                Arrays.asList(
+                                        k.substring(
+                                                        FIELDS_PREFIX.length() + 1,
+                                                        k.length() - SEQUENCE_GROUP.length() - 1)
+                                                .split(FIELDS_SEPARATOR)));
 
-                for (String field : v.split(FIELDS_SEPARATOR)) {
-                    if (!fieldNames.contains(field)) {
-                        throw new IllegalArgumentException(
-                                String.format("Field %s can not be found in table schema.", field));
-                    }
-
-                    List<String> sequenceFieldsList = new ArrayList<>();
-                    for (String sequenceFieldName : sequenceFieldNames) {
-                        if (!fieldNames.contains(sequenceFieldName)) {
-                            throw new IllegalArgumentException(
-                                    String.format(
-                                            "The sequence field group: %s can not be found in table schema.",
-                                            sequenceFieldName));
-                        }
-                        sequenceFieldsList.add(sequenceFieldName);
-                    }
-
-                    if (fields2Group.containsKey(field)) {
-                        List<List<String>> sequenceGroups = new ArrayList<>();
-                        sequenceGroups.add(new ArrayList<>(fields2Group.get(field)));
-                        sequenceGroups.add(sequenceFieldsList);
-
+                for (String sequenceFieldName : sequenceFieldNames) {
+                    if (!tbFieldNames.contains(sequenceFieldName)) {
                         throw new IllegalArgumentException(
                                 String.format(
-                                        "Field %s is defined repeatedly by multiple groups: %s.",
-                                        field, sequenceGroups));
+                                        "The sequence field group: %s can not be found in table schema.",
+                                        sequenceFieldName));
                     }
+                }
+                for (String fieldExp : v.split(FIELDS_SEPARATOR)) {
+                    if (fieldExp.contains("*") || fieldExp.contains("?")) {
+                        // Handle regex pattern
+                        LOG.info(String.format("qf-log: handle the regex fieldExp = %s", fieldExp));
+                        Pattern pattern = Pattern.compile(fieldExp);
 
-                    Set<String> group = fields2Group.computeIfAbsent(field, p -> new HashSet<>());
-                    group.addAll(sequenceFieldsList);
+                        // Find all matching fields
+                        List<String> matchingFields =
+                                tbFieldNames.stream()
+                                        .filter(
+                                                f ->
+                                                        pattern.matcher(f).matches()
+                                                                && !sequenceFieldNames.contains(f))
+                                        .collect(Collectors.toList());
+
+                        if (matchingFields.isEmpty()) {
+                            throw new IllegalArgumentException(
+                                    String.format(
+                                            "No fields match the regex pattern: %s", fieldExp));
+                        }
+                        for (String matchingField : matchingFields) {
+                            validateAndAddToGroup(matchingField, sequenceFieldNames, fields2Group);
+                        }
+                    } else {
+                        // Handle non-regex fields as before
+                        if (!tbFieldNames.contains(fieldExp)) {
+                            throw new IllegalArgumentException(
+                                    String.format(
+                                            "Field %s can not be found in table schema.",
+                                            fieldExp));
+                        }
+                        validateAndAddToGroup(fieldExp, sequenceFieldNames, fields2Group);
+                    }
                 }
             }
         }
@@ -441,6 +460,23 @@ public class SchemaValidation {
             throw new IllegalArgumentException(
                     "Should not defined aggregation function on sequence group: " + illegalGroup);
         }
+    }
+
+    private static void validateAndAddToGroup(
+            String field, List<String> sequenceFieldsList, Map<String, Set<String>> fields2Group) {
+        if (fields2Group.containsKey(field)) {
+            List<List<String>> sequenceGroups = new ArrayList<>();
+            sequenceGroups.add(new ArrayList<>(fields2Group.get(field)));
+            sequenceGroups.add(sequenceFieldsList);
+
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Field %s is defined repeatedly by multiple groups: %s.",
+                            field, sequenceGroups));
+        }
+
+        Set<String> group = fields2Group.computeIfAbsent(field, p -> new HashSet<>());
+        group.addAll(sequenceFieldsList);
     }
 
     private static void validateDefaultValues(TableSchema schema) {
