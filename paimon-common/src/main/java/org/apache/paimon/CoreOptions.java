@@ -322,7 +322,7 @@ public class CoreOptions implements Serializable {
     public static final ConfigOption<Integer> SNAPSHOT_EXPIRE_LIMIT =
             key("snapshot.expire.limit")
                     .intType()
-                    .defaultValue(50)
+                    .defaultValue(100)
                     .withDescription(
                             "The maximum number of snapshots allowed to expire at a time.");
 
@@ -1015,7 +1015,7 @@ public class CoreOptions implements Serializable {
     public static final ConfigOption<Duration> CONSUMER_EXPIRATION_TIME =
             key("consumer.expiration-time")
                     .durationType()
-                    .noDefaultValue()
+                    .defaultValue(Duration.ofDays(1))
                     .withDescription(
                             "The expiration interval of consumer files. A consumer file will be expired if "
                                     + "it's lifetime after last modification is over this value.");
