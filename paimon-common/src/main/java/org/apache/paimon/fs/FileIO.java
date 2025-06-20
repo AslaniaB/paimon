@@ -219,10 +219,18 @@ public interface FileIO extends Serializable {
                     new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             StringBuilder builder = new StringBuilder();
             String line;
+            LOG.info("Start reading file - " + path);
+            long beginTimeMs = System.currentTimeMillis();
             while ((line = reader.readLine()) != null) {
                 builder.append(line);
             }
-            return builder.toString();
+            String result = builder.toString();
+            LOG.info(
+                    "Finish reading file {} with {} bytes in {} ms",
+                    path,
+                    result.length(),
+                    System.currentTimeMillis() - beginTimeMs);
+            return result;
         }
     }
 
@@ -250,8 +258,14 @@ public interface FileIO extends Serializable {
     default void writeFile(Path path, String content, boolean overwrite) throws IOException {
         try (PositionOutputStream out = newOutputStream(path, overwrite)) {
             OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+            long beginTimeMs = System.currentTimeMillis();
             writer.write(content);
             writer.flush();
+            LOG.info(
+                    "Finish Writing file {} with {} bytes in {} ms",
+                    path,
+                    content.length(),
+                    System.currentTimeMillis() - beginTimeMs);
         }
     }
 

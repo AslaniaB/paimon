@@ -253,10 +253,13 @@ public class LocalFileIO implements FileIO {
 
         private final FileInputStream in;
         private final FileChannel channel;
+        private final File file;
 
         public LocalSeekableInputStream(File file) throws FileNotFoundException {
             this.in = new FileInputStream(file);
             this.channel = in.getChannel();
+            this.file = file;
+            LOG.info("New input stream from local file - " + file.getAbsolutePath());
         }
 
         @Override
@@ -284,6 +287,7 @@ public class LocalFileIO implements FileIO {
         @Override
         public void close() throws IOException {
             in.close();
+            LOG.info("Close the input steam of local file - " + file.getAbsolutePath());
         }
 
         @Override
@@ -298,11 +302,14 @@ public class LocalFileIO implements FileIO {
 
     /** Local {@link PositionOutputStream}. */
     public static class LocalPositionOutputStream extends PositionOutputStream {
+        private final File file;
 
         private final FileOutputStream out;
 
         public LocalPositionOutputStream(File file) throws FileNotFoundException {
+            this.file = file;
             this.out = new FileOutputStream(file);
+            LOG.info("New out stream to local file - " + file.getAbsolutePath());
         }
 
         @Override
@@ -333,6 +340,7 @@ public class LocalFileIO implements FileIO {
         @Override
         public void close() throws IOException {
             out.close();
+            LOG.info("Close the output stream of local file - " + file.getAbsolutePath());
         }
     }
 

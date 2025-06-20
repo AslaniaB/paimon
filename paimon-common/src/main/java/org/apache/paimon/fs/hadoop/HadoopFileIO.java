@@ -73,14 +73,15 @@ public class HadoopFileIO implements FileIO {
     @Override
     public SeekableInputStream newInputStream(Path path) throws IOException {
         org.apache.hadoop.fs.Path hadoopPath = path(path);
-        return new HadoopSeekableInputStream(getFileSystem(hadoopPath).open(hadoopPath));
+        return new HadoopSeekableInputStream(
+                getFileSystem(hadoopPath).open(hadoopPath), hadoopPath);
     }
 
     @Override
     public PositionOutputStream newOutputStream(Path path, boolean overwrite) throws IOException {
         org.apache.hadoop.fs.Path hadoopPath = path(path);
         return new HadoopPositionOutputStream(
-                getFileSystem(hadoopPath).create(hadoopPath, overwrite));
+                getFileSystem(hadoopPath).create(hadoopPath, overwrite), hadoopPath);
     }
 
     @Override
@@ -197,9 +198,12 @@ public class HadoopFileIO implements FileIO {
         private static final int MIN_SKIP_BYTES = 1024 * 1024;
 
         private final FSDataInputStream in;
+        private final org.apache.hadoop.fs.Path path;
 
-        private HadoopSeekableInputStream(FSDataInputStream in) {
+        private HadoopSeekableInputStream(FSDataInputStream in, org.apache.hadoop.fs.Path path) {
             this.in = in;
+            this.path = path;
+            LOG.info("New input stream from hadoop file - " + path);
         }
 
         @Override
@@ -235,6 +239,7 @@ public class HadoopFileIO implements FileIO {
         @Override
         public void close() throws IOException {
             in.close();
+            LOG.info("Close the input stream of hadoop file - " + path);
         }
 
         /**
@@ -266,9 +271,12 @@ public class HadoopFileIO implements FileIO {
     private static class HadoopPositionOutputStream extends PositionOutputStream {
 
         private final FSDataOutputStream out;
+        private final org.apache.hadoop.fs.Path path;
 
-        private HadoopPositionOutputStream(FSDataOutputStream out) {
+        private HadoopPositionOutputStream(FSDataOutputStream out, org.apache.hadoop.fs.Path path) {
             this.out = out;
+            this.path = path;
+            LOG.info("New out stream to hadoop file - " + path);
         }
 
         @Override
@@ -299,6 +307,7 @@ public class HadoopFileIO implements FileIO {
         @Override
         public void close() throws IOException {
             out.close();
+            LOG.info("Close the output stream of hadoop file - " + path);
         }
     }
 
@@ -379,9 +388,11 @@ public class HadoopFileIO implements FileIO {
         org.apache.hadoop.fs.Path hadoopTemp = path(tempPath);
         try {
             try (PositionOutputStream out = newOutputStream(tempPath, false)) {
+                LOG.info("Start writing hadoop temp file - " + tempPath.toString());
                 OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
                 writer.write(content);
                 writer.flush();
+                LOG.info("Finish writing hadoop temp file - " + tempPath.toString());
             }
 
             renameMethod.invoke(

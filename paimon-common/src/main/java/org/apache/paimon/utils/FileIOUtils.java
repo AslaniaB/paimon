@@ -19,6 +19,8 @@
 package org.apache.paimon.utils;
 
 import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -42,6 +44,7 @@ import static org.apache.paimon.utils.Preconditions.checkNotNull;
  * and creation of temporary files.
  */
 public class FileIOUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(FileIOUtils.class);
 
     /** Global lock to prevent concurrent directory deletes under Windows and MacOS. */
     private static final Object DELETE_LOCK = new Object();
@@ -79,7 +82,13 @@ public class FileIOUtils {
 
     public static void writeFile(File file, String contents, String encoding) throws IOException {
         byte[] bytes = contents.getBytes(encoding);
+        long beginTimeMs = System.currentTimeMillis();
         Files.write(file.toPath(), bytes, StandardOpenOption.WRITE);
+        LOG.info(
+                "Finish Writing file {} with {} bytes in {} ms",
+                file.getAbsolutePath(),
+                bytes.length,
+                System.currentTimeMillis() - beginTimeMs);
     }
 
     public static void writeFileUtf8(File file, String contents) throws IOException {
@@ -96,8 +105,14 @@ public class FileIOUtils {
 
         try {
             out = openOutputStream(file, append);
+            long beginTimeMs = System.currentTimeMillis();
             out.write(data);
             out.close();
+            LOG.info(
+                    "Finish Writing file {} with {} bytes in {} ms",
+                    file.getAbsolutePath(),
+                    data.length,
+                    System.currentTimeMillis() - beginTimeMs);
         } finally {
             IOUtils.closeQuietly(out);
         }
@@ -147,7 +162,14 @@ public class FileIOUtils {
                 throw new OutOfMemoryError("Required array size too large");
             }
 
-            return read(in, (int) size);
+            long beginTime = System.currentTimeMillis();
+            byte[] bytes = read(in, (int) size);
+            LOG.info(
+                    "Finish reading {} bytes in {} ms from local file - {}",
+                    bytes.length,
+                    System.currentTimeMillis() - beginTime,
+                    path);
+            return bytes;
         }
     }
 
