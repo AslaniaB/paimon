@@ -62,11 +62,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.api.common.typeinfo.BasicTypeInfo.STRING_TYPE_INFO;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.apache.paimon.utils.Preconditions.checkArgument;
 
 /** Flink {@link OrphanFilesClean}, it will submit a job for a table. */
 public class FlinkOrphanFilesClean extends OrphanFilesClean {
@@ -324,9 +324,18 @@ public class FlinkOrphanFilesClean extends OrphanFilesClean {
             String databaseName,
             @Nullable String tableName)
             throws Catalog.DatabaseNotExistException, Catalog.TableNotExistException {
-        List<String> tableNames = Collections.singletonList(tableName);
-        if (tableName == null || "*".equals(tableName)) {
-            tableNames = catalog.listTables(databaseName);
+        List<String> tableNames = catalog.listTables(databaseName);
+        if (tableName != null) {
+            String tbPatternStr =
+                    tableName
+                            .replaceAll("\\*", ".*")
+                            .replaceAll("\\+", ".+")
+                            .replaceAll("\\?", ".?");
+            Pattern tbNamePattern = Pattern.compile(tbPatternStr);
+            tableNames =
+                    tableNames.stream()
+                            .filter(tb -> tbNamePattern.matcher(tb).matches())
+                            .collect(Collectors.toList());
         }
 
         List<DataStream<CleanOrphanFilesResult>> orphanFilesCleans =
@@ -334,10 +343,13 @@ public class FlinkOrphanFilesClean extends OrphanFilesClean {
         for (String t : tableNames) {
             Identifier identifier = new Identifier(databaseName, t);
             Table table = catalog.getTable(identifier);
-            checkArgument(
-                    table instanceof FileStoreTable,
-                    "Only FileStoreTable supports remove-orphan-files action. The table type is '%s'.",
-                    table.getClass().getName());
+            if (!(table instanceof FileStoreTable)) {
+                LOG.warn(
+                        "Only FileStoreTable supports remove-orphan-files action. Skip table {} since it's table type is '{}'.",
+                        t,
+                        table.getClass().getName());
+                continue;
+            }
 
             DataStream<CleanOrphanFilesResult> clean =
                     new FlinkOrphanFilesClean(
